@@ -11,6 +11,8 @@ namespace FanControl.OpenFanPlugin
         private OpenFanManagementControlSensor[] _fanControls;
         private OpenFanManagementFanSensor[] _fanSensors;
 
+        private static readonly int[] _fanIndexes = Enumerable.Range(0, 10).ToArray();
+
         public string Name => "OpenFAN";
         private readonly IPluginLogger _logger;
         private readonly IPluginDialog _dialog;
@@ -51,10 +53,10 @@ namespace FanControl.OpenFanPlugin
         {
             if (_OpenFanInitialized)
             {
-                _fanControls = Enumerable.Range(0, 10)
+                _fanControls = _fanIndexes
                     .Select(i => new OpenFanManagementControlSensor(i)).ToArray();
 
-                _fanSensors = Enumerable.Range(0, 10)
+                _fanSensors = _fanIndexes
                     .Select(i => new OpenFanManagementFanSensor(i)).ToArray();
 
                 container.ControlSensors.AddRange(_fanControls);
