@@ -1,18 +1,22 @@
-﻿using FanControl.Plugins;
-using Microsoft.Win32;
+﻿using Microsoft.Win32;
 using System;
 using System.Collections.Generic;
 using System.IO.Ports;
 using System.Linq;
-using System.Security.Cryptography;
 using System.Text.RegularExpressions;
 
 namespace FanControl.OpenFanPlugin
 {
+    public class OpenFanException: Exception
+    {
+        private OpenFanException(string message) : base(message) { }
+
+        public static OpenFanException SerialNotOpened(string command) => new OpenFanException($"OpenFAN not opened, cannot send command {command}");
+    }
 
     public class SerialResponse
     {
-        private String _res;
+        private string _res;
         private int _cmd = 0;
         private List<int> _data = new List<int>();
 
@@ -41,34 +45,12 @@ namespace FanControl.OpenFanPlugin
             }
         }
 
-        public int getCMD()
-        {
-            try
-            {
-                return _cmd;
-            }
-            catch (Exception e)
-            {
-                return 0;
-            }
-        }
+        public int CMD => _cmd;
 
-
-        public int getData(int pos)
-        {
-            try
-            {
-                return _data[pos];
-            }
-            catch (Exception e)
-            {
-                Console.WriteLine(e);
-                return 0;
-            }
-        }
+        public IReadOnlyList<int> Data => _data;
     }
 
-    public class OpenFan_Serial
+    public class OpenFan_Serial : IDisposable
     {
         private SerialPort _serialPort = new SerialPort();
         private bool IsConnectionOpen = false;
@@ -93,7 +75,7 @@ namespace FanControl.OpenFanPlugin
 
         ~OpenFan_Serial()
         {
-            _serialPort.Close();
+            Close();
         }
 
         public void Close()
@@ -104,36 +86,43 @@ namespace FanControl.OpenFanPlugin
             }
         }
 
-        public int ReadRPM(int index)
+        public SerialResponse ReadRPM()
         {
-            SerialResponse res = SendRequest(">00\r\n");
-            return res.getData(index);
+            const string READ_RPM_CMD = ">00\r\n";
+            if (!IsConnectionOpen )
+            {
+                throw OpenFanException.SerialNotOpened(READ_RPM_CMD);
+            }
+
+            SerialResponse res = SendRequest(READ_RPM_CMD);
+            return res;
         }
 
-        public void SetPercent(int index, int value)
+        public SerialResponse SetPercent(int index, int value)
         {
             value = (value * 255 / 100);
-            String request = String.Format(">02{0:X2}{1:X2}\r\n", index, value);
-            SendRequest(request);
+            string request = string.Format(">02{0:X2}{1:X2}\r\n", index, value);
+            return SendRequest(request);
         }
 
+        public void Open()
+        {
+            _serialPort.Open();
+            IsConnectionOpen = true;
+        }
 
         private SerialResponse SendRequest(string cmd)
         {
             bool _response_found = false;
-            String res = "";
+            string res = "";
 
-
-            _serialPort.Open();
-            IsConnectionOpen = true;
             _serialPort.DiscardInBuffer();
             _serialPort.DiscardOutBuffer();
 
             _serialPort.Write(cmd);
 
             // Wait for response
-            while (_serialPort.BytesToRead == 0) ;
-
+            while (_serialPort.BytesToRead == 0);
 
             while (_response_found == false)
             {
@@ -141,40 +130,37 @@ namespace FanControl.OpenFanPlugin
                 if (res.StartsWith("<"))
                 {
                     _response_found = true;
-                    break;
                 }
             }
-
-            _serialPort.Close();
 
             return new SerialResponse(res.TrimEnd(Environment.NewLine.ToCharArray()));
         }
 
 
-        static List<string> ComPortNames(String VID, String PID)
+        static List<string> ComPortNames( string VID, string PID )
         {
-            String pattern = String.Format("^VID_{0}.PID_{1}", VID, PID);
+            string pattern = string.Format("^VID_{0}.PID_{1}", VID, PID);
             Regex _rx = new Regex(pattern, RegexOptions.IgnoreCase);
             List<string> comports = new List<string>();
 
             RegistryKey rk1 = Registry.LocalMachine;
             RegistryKey rk2 = rk1.OpenSubKey("SYSTEM\\CurrentControlSet\\Enum");
 
-            foreach (String s3 in rk2.GetSubKeyNames())
+            foreach ( string s3 in rk2.GetSubKeyNames())
             {
                 RegistryKey rk3 = rk2.OpenSubKey(s3);
-                foreach (String s in rk3.GetSubKeyNames())
+                foreach ( string s in rk3.GetSubKeyNames())
                 {
                     if (_rx.Match(s).Success)
                     {
                         RegistryKey rk4 = rk3.OpenSubKey(s);
-                        foreach (String s2 in rk4.GetSubKeyNames())
+                        foreach ( string s2 in rk4.GetSubKeyNames())
                         {
                             RegistryKey rk5 = rk4.OpenSubKey(s2);
                             string location = (string)rk5.GetValue("LocationInformation");
                             RegistryKey rk6 = rk5.OpenSubKey("Device Parameters");
                             string portName = (string)rk6.GetValue("PortName");
-                            if (!String.IsNullOrEmpty(portName) && SerialPort.GetPortNames().Contains(portName))
+                            if (!string.IsNullOrEmpty(portName) && SerialPort.GetPortNames().Contains(portName))
                                 comports.Add((string)rk6.GetValue("PortName"));
                         }
                     }
@@ -183,5 +169,9 @@ namespace FanControl.OpenFanPlugin
             return comports;
         }
 
+        public void Dispose()
+        {
+            Close();
+        }
     }
 }

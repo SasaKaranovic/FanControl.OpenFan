@@ -1,7 +1,5 @@
 ﻿using FanControl.Plugins;
-using System;
-using System.Net;
-using FanControl.OpenFanPlugin;
+using System.Collections.Generic;
 
 namespace FanControl.OpenFanPlugin
 {
@@ -9,28 +7,27 @@ namespace FanControl.OpenFanPlugin
     {
         private readonly int _fanIndex;
 
-        public OpenFanManagementFanSensor(int fanIndex) => _fanIndex = fanIndex;
+        public OpenFanManagementFanSensor(int fanIndex)
+        {
+            _fanIndex = fanIndex;
+        }
 
-        public string Identifier => $"OpenFan/Fan{(int)_fanIndex}";
+        public string Identifier => $"OpenFan/Fan/{_fanIndex}";
 
         public float? Value { get; private set; }
 
-        public string Name => $"OpenFan FAN #{(int)_fanIndex + 1}";
+        public string Name => $"OpenFan FAN #{_fanIndex + 1}";
 
         public string Origin => $"OpenFan";
 
         public string Id => "Fan_" + _fanIndex.ToString();
 
-        public void Update() => Value = GetFanRPM();
+        public void Update() { }
 
-        private int GetFanRPM()
+        public void UpdateFanRPM(SerialResponse response)
         {
-            int rpm = 0;
-            OpenFan_Serial OpenFan = new OpenFan_Serial();
-            rpm = OpenFan.ReadRPM(_fanIndex);
-            OpenFan.Close();
-
-            return rpm;
+            int rpm = response.Data[_fanIndex];
+            Value = rpm;
         }
     }
 }
