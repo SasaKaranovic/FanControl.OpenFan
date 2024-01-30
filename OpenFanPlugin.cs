@@ -1,14 +1,18 @@
 ﻿using FanControl.Plugins;
 using System;
-using System.Collections.Generic;
 using System.Linq;
 
 namespace FanControl.OpenFanPlugin
 {
-    public class OpenFanPlugin : IPlugin2, IDisposable
+    public class OpenFanPlugin : IPlugin2
     {
         private bool _OpenFanInitialized;
-        private Boolean m_DisposedValue;
+        private object _serialLock = new object();
+        private OpenFan_Serial _serial;
+        private OpenFanManagementControlSensor[] _fanControls;
+        private OpenFanManagementFanSensor[] _fanSensors;
+
+        private static readonly int[] _fanIndexes = Enumerable.Range(0, 10).ToArray();
 
         public string Name => "OpenFAN";
         private readonly IPluginLogger _logger;
@@ -25,6 +29,13 @@ namespace FanControl.OpenFanPlugin
             if (_OpenFanInitialized)
             {
                 _OpenFanInitialized = false;
+                lock (_serialLock)
+                {
+                    _serial.Dispose();
+                }
+
+                _fanControls = null;
+                _fanSensors = null;
             }
         }
 
@@ -32,58 +43,55 @@ namespace FanControl.OpenFanPlugin
         {
             _OpenFanInitialized = true;
             _logger.Log("OpenFAN plugin loaded.");
+
+            lock(_serialLock)
+            {
+                _serial = new OpenFan_Serial();
+            }
         }
 
-        public void Load(IPluginSensorsContainer _container)
+        public void Load(IPluginSensorsContainer container)
         {
             if (_OpenFanInitialized)
             {
-                IEnumerable<OpenFanManagementControlSensor> fanControls = new[] {
-                            0, 1, 2, 3, 4, 5, 6, 7, 8, 9
-                        }.Select(i => new OpenFanManagementControlSensor(i)).ToArray();
+                _fanControls = _fanIndexes
+                    .Select(i => new OpenFanManagementControlSensor(i)).ToArray();
 
-                IEnumerable<OpenFanManagementFanSensor> fanSensors = new[] {
-                            0, 1, 2, 3, 4, 5, 6, 7, 8, 9
-                        }.Select(i => new OpenFanManagementFanSensor(i)).ToArray();
+                _fanSensors = _fanIndexes
+                    .Select(i => new OpenFanManagementFanSensor(i)).ToArray();
 
-                _container.ControlSensors.AddRange(fanControls);
-                _container.FanSensors.AddRange(fanSensors);
+                container.ControlSensors.AddRange(_fanControls);
+                container.FanSensors.AddRange(_fanSensors);
             }
         }
 
         public void Update()
         {
-           
-        }
-
-        protected virtual void Dispose(Boolean disposing)
-        {
-            if (!m_DisposedValue)
+            lock (_serialLock)
             {
-                if (disposing)
+                try
                 {
-                  // TODO: dispose managed state (managed objects)
+                    _serial.Open();
+
+                    var rpms = _serial.ReadRPM();
+                    foreach(OpenFanManagementFanSensor fan in _fanSensors)
+                    {
+                        fan.UpdateFanRPM(rpms);
+                    }
+                    foreach(OpenFanManagementControlSensor control in _fanControls)
+                    {
+                        control.SetFanSpeed(_serial);
+                    }
                 }
-
-              // TODO: free unmanaged resources (unmanaged objects) and override finalizer
-              // TODO: set large fields to null
-              Close();
-              m_DisposedValue = true;
+                catch (Exception exception)
+                {
+                    // do something
+                }
+                finally
+                {
+                    _serial.Close();
+                }
             }
-        }
-
-        // // TODO: override finalizer only if 'Dispose(bool disposing)' has code to free unmanaged resources
-         ~OpenFanPlugin()
-         {
-             // Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
-             Dispose(disposing: false);
-         }
-
-        public void Dispose()
-        {
-            // Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
-            Dispose(disposing: true);
-            GC.SuppressFinalize(this);
         }
     }
 }
