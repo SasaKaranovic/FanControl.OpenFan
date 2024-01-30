@@ -7,6 +7,7 @@ namespace FanControl.OpenFanPlugin
     public class OpenFanPlugin : IPlugin2
     {
         private bool _OpenFanInitialized;
+        private object _serialLock = new object();
         private OpenFan_Serial _serial;
         private OpenFanManagementControlSensor[] _fanControls;
         private OpenFanManagementFanSensor[] _fanSensors;
@@ -28,7 +29,7 @@ namespace FanControl.OpenFanPlugin
             if (_OpenFanInitialized)
             {
                 _OpenFanInitialized = false;
-                lock (_serial)
+                lock (_serialLock)
                 {
                     _serial.Dispose();
                 }
@@ -43,7 +44,7 @@ namespace FanControl.OpenFanPlugin
             _OpenFanInitialized = true;
             _logger.Log("OpenFAN plugin loaded.");
 
-            lock(_serial)
+            lock(_serialLock)
             {
                 _serial = new OpenFan_Serial();
             }
@@ -66,7 +67,7 @@ namespace FanControl.OpenFanPlugin
 
         public void Update()
         {
-            lock (_serial)
+            lock (_serialLock)
             {
                 try
                 {
