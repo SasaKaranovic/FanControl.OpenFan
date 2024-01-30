@@ -8,7 +8,7 @@ Either
 * Download the latest `FanControl.OpenFanPlugin.dll` library from [Releases](https://github.com/SasaKaranovic/FanControl.OpenFan/releases)
 * Compile the solution.
 
-and copy `FanControl.OpenFan.dll` into FanControl's "plugins" folder.
+and copy `FanControl.OpenFanPlugin.dll` into FanControl's "plugins" folder.
 You might need to "unlock" the dll in its properties.
 
 ## What is the OpenFAN project?
