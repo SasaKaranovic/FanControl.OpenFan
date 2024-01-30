@@ -5,7 +5,7 @@ Plugin for [FanControl](https://github.com/Rem0o/FanControl.Releases) that provi
 ## To install
 
 Either
-* Download the latest binaries from [Release](Release) folder
+* Download the latest binaries from [Releases](https://github.com/SasaKaranovic/FanControl.OpenFan/releases)
 * Compile the solution.
 
 and copy `FanControl.OpenFan.dll` into FanControl's "plugins" folder.
